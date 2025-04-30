@@ -19,6 +19,7 @@ import {
 import { SurroundingFlyout } from './surrounding_flyout';
 import PPLService from '../../../../services/requests/ppl';
 import { isValidTraceId } from '../../utils';
+import { SecondaryFlyout } from './secondary_flyout';
 
 export interface IDocType {
   [key: string]: string;
@@ -40,6 +41,7 @@ interface FlyoutButtonProps {
   sortingFields: any;
   rowHeightsOptions: any;
   rows: any;
+  secondaryAction?: boolean;
 }
 
 export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
@@ -59,12 +61,14 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
     sortingFields,
     rowHeightsOptions,
     rows,
+    secondaryAction,
   } = props;
 
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
   const [surroundingEventsOpen, setSurroundingEventsOpen] = useState<boolean>(false);
   const [openTraces, setOpenTraces] = useState<boolean>(false);
   const [flyoutToggleSize, setFlyoutToggleSize] = useState(true);
+  const [secondaryFlyoutOpen, setSecondaryFlyoutOpen] = useState<boolean>(false);
 
   useImperativeHandle(ref, () => ({
     closeAllFlyouts(openDocId: string) {
@@ -135,6 +139,15 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
     }
   };
 
+  const toggleSecondaryFlyout = () => {
+    if (detailsOpen || surroundingEventsOpen || openTraces) {
+      setDetailsOpen(false);
+      setSurroundingEventsOpen(false);
+      setOpenTraces(false);
+    }
+    setSecondaryFlyoutOpen(!secondaryFlyoutOpen);
+  };
+
   const getExpColapTd = () => {
     return (
       <td className="osdDocTableCell__toggleDetails" key={uniqueId('grid-td-')}>
@@ -154,7 +167,6 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
     const cols = [];
     const fieldClsName = 'osdDocTableCell__dataField eui-textBreakAll eui-textBreakWord';
     const timestampClsName = 'eui-textNoWrap';
-    // No field is selected
     if (!selectedColumns || selectedColumns.length === 0) {
       if (has(document, timeStampField)) {
         cols.push(
@@ -172,7 +184,6 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
         })
       );
     } else {
-      // Has at least one field selected
       const filteredDoc = {};
       forEach(selectedColumns, (selCol) => {
         if (has(document, selCol.name)) {
@@ -191,7 +202,6 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
       });
     }
 
-    // Add detail toggling column
     cols.unshift(getExpColapTd());
     return cols;
   };
@@ -267,13 +277,28 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
     flyoutToggleSize,
   ]);
 
-  let flyout;
-  if (detailsOpen) {
-    flyout = memorizedDocFlyout;
-  }
+  let flyout = null;
 
-  if (surroundingEventsOpen) {
-    flyout = memorizedSurroundingFlyout;
+  if (secondaryAction && secondaryFlyoutOpen) {
+    flyout = (
+      <SecondaryFlyout
+        http={http}
+        doc={doc}
+        timeStampField={timeStampField}
+        secondaryFlyoutOpen={secondaryFlyoutOpen}
+        setSecondaryFlyoutOpen={setSecondaryFlyoutOpen}
+        flyoutToggleSize={flyoutToggleSize}
+        setFlyoutToggleSize={setFlyoutToggleSize}
+      />
+    );
+  } else if (!secondaryAction) {
+    if (detailsOpen) {
+      flyout = memorizedDocFlyout;
+    }
+
+    if (surroundingEventsOpen) {
+      flyout = memorizedSurroundingFlyout;
+    }
   }
 
   useEffect(() => {
@@ -282,13 +307,29 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
     }
   }, [detailsOpen]);
 
+  const handleClick = () => {
+    if (secondaryAction) {
+      toggleSecondaryFlyout();
+    } else {
+      toggleDetailOpen();
+    }
+  };
+
   return (
     <>
       <EuiSmallButtonIcon
-        onClick={() => toggleDetailOpen()}
-        iconType={detailsOpen || surroundingEventsOpen ? 'minimize' : 'inspect'}
-        aria-label="inspect document details"
-        data-test-subj="eventExplorer__flyout"
+        onClick={handleClick}
+        iconType={
+          secondaryAction
+            ? secondaryFlyoutOpen
+              ? 'minimize'
+              : 'dashboardApp'
+            : detailsOpen || surroundingEventsOpen
+            ? 'minimize'
+            : 'inspect'
+        }
+        aria-label={secondaryAction ? 'open secondary flyout' : 'inspect document details'}
+        data-test-subj={secondaryAction ? 'eventExplorer__secondaryFlyout' : 'eventExplorer__flyout'}
       />
       {flyout}
     </>

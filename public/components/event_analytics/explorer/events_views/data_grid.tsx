@@ -187,29 +187,57 @@ export function DataGrid(props: DataGridProps) {
         id: 'inspectCollapseColumn',
         headerCellRender: () => null,
         rowCellRender: ({ rowIndex }: { rowIndex: number }) => {
+          const trueIndex = findTrueIndex(rowIndex);
           return (
-            <FlyoutButton
-              ref={null}
-              http={http}
-              key={null}
-              docId={'undefined'}
-              doc={data[findTrueIndex(rowIndex)]}
-              selectedCols={explorerFields.queriedFields}
-              timeStampField={timeStampField}
-              explorerFields={explorerFields}
-              pplService={pplService}
-              rawQuery={rawQuery}
-              onFlyoutOpen={() => {}}
-              dataGridColumns={dataGridColumns()}
-              dataGridColumnVisibility={dataGridColumnVisibility()}
-              selectedIndex={rowIndex}
-              sortingFields={sortingFields}
-              rowHeightsOptions={rowHeightsOptions()}
-              rows={data}
-            />
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {/* Existing flyout button */}
+              <FlyoutButton
+                ref={null}
+                http={http}
+                key={null}
+                docId={'undefined'}
+                doc={data[trueIndex]}
+                selectedCols={explorerFields.queriedFields}
+                timeStampField={timeStampField}
+                explorerFields={explorerFields}
+                pplService={pplService}
+                rawQuery={rawQuery}
+                onFlyoutOpen={() => {}}
+                dataGridColumns={dataGridColumns()}
+                dataGridColumnVisibility={dataGridColumnVisibility()}
+                selectedIndex={rowIndex}
+                sortingFields={sortingFields}
+                rowHeightsOptions={rowHeightsOptions()}
+                rows={data}
+              />
+              
+              {/* New second flyout button */}
+              <FlyoutButton
+                ref={null}
+                http={http}
+                key={`secondary-${rowIndex}`}
+                docId={'undefined'}
+                doc={data[trueIndex]}
+                selectedCols={explorerFields.queriedFields}
+                timeStampField={timeStampField}
+                explorerFields={explorerFields}
+                pplService={pplService}
+                rawQuery={rawQuery}
+                onFlyoutOpen={() => {}}
+                dataGridColumns={dataGridColumns()}
+                dataGridColumnVisibility={dataGridColumnVisibility()}
+                selectedIndex={rowIndex}
+                sortingFields={sortingFields}
+                rowHeightsOptions={rowHeightsOptions()}
+                rows={data}
+                // Add a custom property to differentiate this button's behavior
+                secondaryAction={true}
+              />
+            </div>
           );
         },
-        width: 40,
+        // Increase width to accommodate two buttons
+        width: 80,
       },
     ];
   };
