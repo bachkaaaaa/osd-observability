@@ -125,7 +125,13 @@ export const SecondaryFlyout = ({
 
   // Render conversation panel
   const flyoutBody = (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      position: 'relative', // Add position relative to parent
+      overflow: 'hidden'    // Prevent overflow from parent
+    }}>
       {/* Messages container with scroll */}
       <div 
         style={{ 
@@ -135,7 +141,9 @@ export const SecondaryFlyout = ({
           marginBottom: '8px',
           background: '#f5f7fa',
           borderRadius: '4px',
-          minHeight: '300px'
+          minHeight: '300px',
+          maxHeight: 'calc(100% - 60px)', // Reserve space for input area
+          paddingBottom: '16px'           // Add padding to avoid messages being cut
         }}
       >
         <EuiCommentList>
@@ -181,8 +189,16 @@ export const SecondaryFlyout = ({
         </EuiCommentList>
       </div>
       
-      {/* Input area */}
-      <div style={{ marginTop: 'auto' }}>
+      {/* Input area - fixed at the bottom */}
+      <div style={{ 
+        position: 'sticky',
+        bottom: 10,
+        backgroundColor: 'white',
+        padding: '8px 0',
+        borderTop: '1px solid #eee',
+        zIndex: 100,
+        marginTop: 'auto'
+      }}>
         <EuiFlexGroup gutterSize="s">
           <EuiFlexItem>
             <EuiFieldText
