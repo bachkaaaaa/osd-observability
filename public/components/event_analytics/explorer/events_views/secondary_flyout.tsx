@@ -15,8 +15,15 @@ import {
   EuiLoadingSpinner,
   EuiToolTip,
   EuiIcon,
+  EuiModal,
+  EuiModalHeader,
+  EuiModalHeaderTitle,
+  EuiModalBody,
+  EuiModalFooter,
+  EuiFormRow,
 } from '@elastic/eui';
 import { FlyoutContainers } from '../../../common/flyout_containers';
+import { NOTEBOOKS_API_PREFIX, CREATE_NOTE_MESSAGE } from '../../../../../common/constants/notebooks';
 
 // Storage key for persisting conversations
 const STORAGE_KEY = 'chatAssistant_conversation';
@@ -64,6 +71,11 @@ export const SecondaryFlyout = ({
   
   // State for save success message
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Add state for save notebook modal
+  const [isNotebookModalVisible, setIsNotebookModalVisible] = useState(false);
+  const [notebookTitle, setNotebookTitle] = useState('Chat Conversation');
+  const [isSaving, setIsSaving] = useState(false);
 
   // State to track if options should be shown
   const [showOptions, setShowOptions] = useState(false);
@@ -225,23 +237,113 @@ export const SecondaryFlyout = ({
     setMessages([defaultMessage]);
   };
   
-  // Save to notebook
+  // Updated save to notebook function - shows modal to get title
   const saveToNotebook = () => {
-    // In a real implementation, you would call an API to save to a notebook
-    // For now, we'll just show a success indicator
-    
-    // Format the conversation for saving
-    const formattedConversation = messages.map(msg => {
-      return `${msg.isUser ? 'You' : 'Assistant'} (${msg.timestamp.toLocaleString()}): ${msg.content}`;
-    }).join('\n\n');
-    
-    // In a real implementation, you might save this to a notebook API
-    console.log('Saving to notebook:', formattedConversation);
-    
-    // Show success message briefly
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2000);
+    // Format current date for default title
+    const currentDate = new Date().toLocaleDateString();
+    setNotebookTitle(`Chat Conversation - ${currentDate}`);
+    setIsNotebookModalVisible(true);
   };
+  
+  // Function to handle actual notebook creation
+  const createNotebook = async () => {
+    if (!notebookTitle.trim()) {
+      return; // Don't create notebook without a title
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      // Format the conversation for the notebook content
+      const markdownContent = messages.map(msg => {
+        const author = msg.isUser ? '**You**' : '**Assistant**';
+        const time = msg.timestamp.toLocaleString();
+        return `${author} (${time}):\n\n${msg.content}\n`;
+      }).join('\n---\n\n');
+      
+      // Create a new notebook
+      const createResponse = await http.post(`${NOTEBOOKS_API_PREFIX}/note/savedNotebook`, {
+        body: JSON.stringify({ name: notebookTitle }),
+      });
+      
+      // Add a paragraph with the conversation content
+      if (createResponse) {
+        await http.post(`${NOTEBOOKS_API_PREFIX}/savedNotebook/paragraph`, {
+          body: JSON.stringify({
+            noteId: createResponse,
+            paragraphIndex: 0,
+            paragraphInput: `%md\n# Chat Conversation\n\n${markdownContent}`,
+            inputType: 'MARKDOWN',
+          }),
+        });
+        
+        // Show success message
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+        
+        // Close the modal
+        setIsNotebookModalVisible(false);
+        
+        // Provide a link to the new notebook
+        console.log(`Notebook created with ID: ${createResponse}`);
+      }
+    } catch (error) {
+      console.error('Error saving notebook:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Cancel notebook creation
+  const cancelNotebookCreation = () => {
+    setIsNotebookModalVisible(false);
+  };
+  
+  // Notebook creation modal
+  const notebookModal = isNotebookModalVisible ? (
+    <EuiModal onClose={cancelNotebookCreation}>
+      <EuiModalHeader>
+        <EuiModalHeaderTitle>Save Conversation as Notebook</EuiModalHeaderTitle>
+      </EuiModalHeader>
+      
+      <EuiModalBody>
+        <EuiText size="s">
+          <p>{CREATE_NOTE_MESSAGE || 'Enter a name to describe the purpose of this notebook.'}</p>
+        </EuiText>
+        <EuiSpacer size="m" />
+        <EuiFormRow label="Notebook Title">
+          <EuiFieldText
+            placeholder="Enter notebook title"
+            value={notebookTitle}
+            onChange={(e) => setNotebookTitle(e.target.value)}
+            fullWidth
+            data-test-subj="notebookTitleInput"
+            isInvalid={!notebookTitle.trim()}
+            disabled={isSaving}
+          />
+        </EuiFormRow>
+      </EuiModalBody>
+      
+      <EuiModalFooter>
+        <EuiButton
+          onClick={cancelNotebookCreation}
+          disabled={isSaving}
+          data-test-subj="cancelNotebookCreationButton"
+        >
+          Cancel
+        </EuiButton>
+        <EuiButton
+          fill
+          onClick={createNotebook}
+          isLoading={isSaving}
+          disabled={!notebookTitle.trim() || isSaving}
+          data-test-subj="createNotebookButton"
+        >
+          Save
+        </EuiButton>
+      </EuiModalFooter>
+    </EuiModal>
+  ) : null;
 
   // Render flyout header with action buttons
   const flyoutHeader = (
@@ -539,13 +641,16 @@ export const SecondaryFlyout = ({
   );
 
   return (
-    <FlyoutContainers
-      closeFlyout={closeFlyout}
-      flyoutHeader={flyoutHeader}
-      flyoutBody={flyoutBody}
-      flyoutFooter={flyoutFooter}
-      ariaLabel={'chatFlyout'}
-      size={flyoutToggleSize ? 'm' : 'l'}
-    />
+    <>
+      <FlyoutContainers
+        closeFlyout={closeFlyout}
+        flyoutHeader={flyoutHeader}
+        flyoutBody={flyoutBody}
+        flyoutFooter={flyoutFooter}
+        ariaLabel={'chatFlyout'}
+        size={flyoutToggleSize ? 'm' : 'l'}
+      />
+      {notebookModal}
+    </>
   );
 };
