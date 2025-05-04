@@ -30,6 +30,7 @@ import { useFetchEvents } from '../../hooks';
 import { redoQuery } from '../../utils/utils';
 import { FlyoutButton } from './docViewRow';
 import { HitsCounter } from '../timechart/hits_counter';
+import { ChatProvider, useChatContext } from './chat_context';
 
 export interface DataGridProps {
   http: HttpSetup;
@@ -51,6 +52,35 @@ export interface DataGridProps {
 const defaultFormatGrid = (columns: EuiDataGridColumn[]) => columns;
 
 export function DataGrid(props: DataGridProps) {
+  const {
+    http,
+    pplService,
+    rows,
+    explorerFields,
+    timeStampField,
+    rawQuery,
+    totalHits,
+    requestParams,
+    startTime,
+    endTime,
+    isDefaultDataSource,
+    formatGridColumn = defaultFormatGrid,
+    OuiDataGridProps,
+  } = props;
+
+  return (
+    <ChatProvider>
+      <DataGridContent {...props} />
+      <SingleChatFlyout 
+        http={http}
+        timeStampField={timeStampField}
+      />
+    </ChatProvider>
+  );
+}
+
+// New component that renders the actual DataGrid content
+function DataGridContent(props: DataGridProps) {
   const {
     http,
     pplService,
@@ -336,5 +366,31 @@ export function DataGrid(props: DataGridProps) {
         />
       </div>
     </EuiPanel>
+  );
+}
+
+// Component for the single shared flyout
+function SingleChatFlyout({ http, timeStampField }) {
+  const { 
+    isSecondaryFlyoutOpen, 
+    closeSecondaryFlyout, 
+    flyoutToggleSize, 
+    setFlyoutToggleSize,
+    chatRef
+  } = useChatContext();
+  
+  if (!isSecondaryFlyoutOpen) return null;
+  
+  return (
+    <SecondaryFlyout
+      ref={chatRef}
+      http={http}
+      doc={null} // Not needed, we'll add docs through messages
+      timeStampField={timeStampField}
+      secondaryFlyoutOpen={isSecondaryFlyoutOpen}
+      setSecondaryFlyoutOpen={closeSecondaryFlyout}
+      flyoutToggleSize={flyoutToggleSize}
+      setFlyoutToggleSize={setFlyoutToggleSize}
+    />
   );
 }

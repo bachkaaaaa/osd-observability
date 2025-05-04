@@ -145,7 +145,11 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
       setSurroundingEventsOpen(false);
       setOpenTraces(false);
     }
-    setSecondaryFlyoutOpen(!secondaryFlyoutOpen);
+    
+    // When opening the flyout, record that this row was selected
+    // This will trigger the useEffect in SecondaryFlyout to add the row data
+    const newState = !secondaryFlyoutOpen;
+    setSecondaryFlyoutOpen(newState);
   };
 
   const getExpColapTd = () => {

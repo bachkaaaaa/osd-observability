@@ -13,8 +13,13 @@ import {
   EuiCommentList,
   EuiButtonIcon,
   EuiLoadingSpinner,
+  EuiToolTip,
+  EuiIcon,
 } from '@elastic/eui';
 import { FlyoutContainers } from '../../../common/flyout_containers';
+
+// Storage key for persisting conversations
+const STORAGE_KEY = 'chatAssistant_conversation';
 
 interface Message {
   id: string;
@@ -44,17 +49,78 @@ export const SecondaryFlyout = ({
 }: SecondaryFlyoutProps) => {
   // State for message input
   const [messageText, setMessageText] = useState('');
-  // State for all messages
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Hello! How can I help you today?',
-      timestamp: new Date(),
-      isUser: false,
-    },
-  ]);
+  
+  // State for all messages - initialize with saved data or default
+  const [messages, setMessages] = useState<Message[]>([]);
+  
   // State for loading indicator
   const [isLoading, setIsLoading] = useState(false);
+  
+  // State for save success message
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Format doc data for display
+  const formatDocData = (document: any) => {
+    if (!document) return '';
+    const fields = Object.entries(document)
+      .filter(([key, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => `**${key}**: ${value}`)
+      .join('\n');
+    return `Selected row data:\n${fields}`;
+  };
+  
+  // Load saved messages on component mount and add row data
+  useEffect(() => {
+    try {
+      const savedMessages = localStorage.getItem(STORAGE_KEY);
+      let initialMessages: Message[] = [];
+      
+      if (savedMessages) {
+        // Need to convert the date strings back to Date objects
+        initialMessages = JSON.parse(savedMessages).map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+      } else {
+        // Set default welcome message if no saved messages
+        initialMessages = [{
+          id: '1',
+          content: 'Hello! How can I help you today?',
+          timestamp: new Date(),
+          isUser: false,
+        }];
+      }
+      
+      // Add the row data as a system message if we have document data
+      if (doc && Object.keys(doc).length > 0) {
+        const docMessage: Message = {
+          id: `doc-${Date.now()}`,
+          content: formatDocData(doc),
+          timestamp: new Date(),
+          isUser: false,
+        };
+        initialMessages.push(docMessage);
+      }
+      
+      setMessages(initialMessages);
+    } catch (error) {
+      console.error('Error loading saved messages:', error);
+      // Set default if there's an error
+      setMessages([{
+        id: '1',
+        content: 'Hello! How can I help you today?',
+        timestamp: new Date(),
+        isUser: false,
+      }]);
+    }
+  }, [doc]); // Re-run when doc changes
+  
+  // Save messages to local storage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    }
+  }, [messages]);
   
   // Reference to message container for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -80,7 +146,7 @@ export const SecondaryFlyout = ({
   };
 
   // Send message function
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!messageText.trim()) return;
     
     // Add user message
@@ -95,18 +161,30 @@ export const SecondaryFlyout = ({
     setMessageText(''); // Clear input
     setIsLoading(true);
     
-    // Simulate response after a short delay
-    setTimeout(() => {
-      const botMessage: Message = {
-        id: `bot-${Date.now()}`,
-        content: `I received: "${messageText}"`,
-        timestamp: new Date(),
-        isUser: false,
-      };
-      
-      setMessages(prevMessages => [...prevMessages, botMessage]);
+    try {
+      // Send message to dedicated chat endpoint
+      const response = await http.post(`/api/observability/chat/message`, {
+        body: JSON.stringify({
+          message: messageText
+        }),
+      });
+      console.log('Response from server:', response);
+      // Simulate response after a short delay
+      setTimeout(() => {
+        const botMessage: Message = {
+          id: `bot-${Date.now()}`,
+          content: `I received: "${response.response}"`,
+          timestamp: new Date(),
+          isUser: false,
+        };
+        
+        setMessages(prevMessages => [...prevMessages, botMessage]);
+        setIsLoading(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error sending message:', error);
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   // Handle Enter key press
@@ -115,13 +193,111 @@ export const SecondaryFlyout = ({
       sendMessage();
     }
   };
+  
+  // Reset conversation
+  const resetConversation = () => {
+    const defaultMessage = {
+      id: `reset-${Date.now()}`,
+      content: 'Conversation has been reset. How can I help you today?',
+      timestamp: new Date(),
+      isUser: false,
+    };
+    
+    setMessages([defaultMessage]);
+  };
+  
+  // Save to notebook
+  const saveToNotebook = () => {
+    // In a real implementation, you would call an API to save to a notebook
+    // For now, we'll just show a success indicator
+    
+    // Format the conversation for saving
+    const formattedConversation = messages.map(msg => {
+      return `${msg.isUser ? 'You' : 'Assistant'} (${msg.timestamp.toLocaleString()}): ${msg.content}`;
+    }).join('\n\n');
+    
+    // In a real implementation, you might save this to a notebook API
+    console.log('Saving to notebook:', formattedConversation);
+    
+    // Show success message briefly
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
+  };
 
-  // Render flyout header
+  // Render flyout header with action buttons
   const flyoutHeader = (
-    <EuiTitle size="s">
-      <h3>Chat Assistant</h3>
-    </EuiTitle>
+    <EuiFlexGroup alignItems="center" gutterSize="s" responsive={false}>
+      <EuiFlexItem>
+        <EuiTitle size="s">
+          <h3>Chat Assistant</h3>
+        </EuiTitle>
+      </EuiFlexItem>
+      <EuiFlexItem grow={false}>
+        <EuiFlexGroup gutterSize="s" responsive={false}>
+          <EuiFlexItem grow={false}>
+            <EuiToolTip content="Reset conversation">
+              <EuiButtonIcon
+                color="primary"
+                onClick={resetConversation}
+                iconType="refresh"
+                aria-label="Reset conversation"
+                data-test-subj="chatFlyout__resetButton"
+              />
+            </EuiToolTip>
+          </EuiFlexItem>
+          <EuiFlexItem grow={false}>
+            <EuiToolTip content={saveSuccess ? "Saved!" : "Save to notebook"}>
+              <EuiButtonIcon
+                color={saveSuccess ? "success" : "primary"}
+                onClick={saveToNotebook}
+                iconType={saveSuccess ? "check" : "save"}
+                aria-label="Save to notebook"
+                data-test-subj="chatFlyout__saveButton"
+              />
+            </EuiToolTip>
+          </EuiFlexItem>
+        </EuiFlexGroup>
+      </EuiFlexItem>
+    </EuiFlexGroup>
   );
+
+  // Function to render message content with formatting
+  const renderMessageContent = (content: string) => {
+    // Check if this is a data message (starts with "Selected row data:")
+    if (content.startsWith('Selected row data:')) {
+      return (
+        <div>
+          <p><strong>Selected row data:</strong></p>
+          <div style={{ maxHeight: '300px', overflowY: 'auto', background: '#f0f0f0', padding: '8px', borderRadius: '4px' }}>
+            {content.replace('Selected row data:\n', '').split('\n').map((line, index) => {
+              // Split each line by the first colon to separate key and value
+              const [key, ...valueParts] = line.split(':');
+              const value = valueParts.join(':'); // Rejoin in case the value itself contains colons
+              
+              if (key && key.startsWith('**') && key.endsWith('**')) {
+                const cleanKey = key.replace(/\*\*/g, '');
+                return (
+                  <div key={index} style={{ display: 'flex', marginBottom: '4px' }}>
+                    <div style={{ fontWeight: 'bold', minWidth: '120px', marginRight: '8px' }}>
+                      {cleanKey}:
+                    </div>
+                    <div style={{ wordBreak: 'break-all' }}>
+                      {value.trim()}
+                    </div>
+                  </div>
+                );
+              }
+              
+              return <div key={index}>{line}</div>;
+            })}
+          </div>
+        </div>
+      );
+    }
+    
+    // Regular message content
+    return <p>{content}</p>;
+  };
 
   // Render conversation panel
   const flyoutBody = (
@@ -129,8 +305,8 @@ export const SecondaryFlyout = ({
       height: '100%', 
       display: 'flex', 
       flexDirection: 'column',
-      position: 'relative', // Add position relative to parent
-      overflow: 'hidden'    // Prevent overflow from parent
+      position: 'relative', 
+      overflow: 'hidden'
     }}>
       {/* Messages container with scroll */}
       <div 
@@ -142,8 +318,8 @@ export const SecondaryFlyout = ({
           background: '#f5f7fa',
           borderRadius: '4px',
           minHeight: '300px',
-          maxHeight: 'calc(100% - 60px)', // Reserve space for input area
-          paddingBottom: '16px'           // Add padding to avoid messages being cut
+          maxHeight: 'calc(100% - 60px)',
+          paddingBottom: '16px'
         }}
       >
         <EuiCommentList>
@@ -175,7 +351,7 @@ export const SecondaryFlyout = ({
                 }}
               >
                 <EuiText size="s">
-                  <p>{message.content}</p>
+                  {renderMessageContent(message.content)}
                 </EuiText>
               </EuiPanel>
             </EuiComment>
@@ -192,7 +368,7 @@ export const SecondaryFlyout = ({
       {/* Input area - fixed at the bottom */}
       <div style={{ 
         position: 'sticky',
-        bottom: 10,
+        bottom: 0,
         backgroundColor: 'white',
         padding: '8px 0',
         borderTop: '1px solid #eee',
@@ -260,5 +436,3 @@ export const SecondaryFlyout = ({
     />
   );
 };
-
-

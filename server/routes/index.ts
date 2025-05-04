@@ -25,6 +25,7 @@ import { registerVizRoute } from './notebooks/vizRouter';
 import { registerPplRoute } from './ppl';
 import { registerQueryAssistRoutes } from './query_assist/routes';
 import { registerTraceAnalyticsDslRouter } from './trace_analytics_dsl_router';
+import { registerChatRoutes } from './chat';
 
 export function setupRoutes({
   router,
@@ -65,4 +66,7 @@ export function setupRoutes({
   }
 
   registerGettingStartedRoutes(router);
+
+  // Add chat routes
+  registerChatRoutes(router);
 }
