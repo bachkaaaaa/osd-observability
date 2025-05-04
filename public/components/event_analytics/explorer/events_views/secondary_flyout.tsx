@@ -348,11 +348,6 @@ export const SecondaryFlyout = ({
   // Render flyout header with action buttons
   const flyoutHeader = (
     <EuiFlexGroup alignItems="center" gutterSize="s" responsive={false}>
-      <EuiFlexItem>
-        <EuiTitle size="s">
-          <h3>Chat Assistant</h3>
-        </EuiTitle>
-      </EuiFlexItem>
       <EuiFlexItem grow={false}>
         <EuiFlexGroup gutterSize="s" responsive={false}>
           <EuiFlexItem grow={false}>
@@ -379,6 +374,18 @@ export const SecondaryFlyout = ({
           </EuiFlexItem>
         </EuiFlexGroup>
       </EuiFlexItem>
+      <EuiFlexItem grow={true} className="eui-textCenter">
+        <EuiTitle size="m">
+          <h3 style={{ 
+            fontWeight: '600', 
+            fontSize: '18px',
+            fontFamily: 'Inter, Helvetica, Arial, sans-serif' 
+          }}>
+            Chat Assistant
+          </h3>
+        </EuiTitle>
+      </EuiFlexItem>
+      <EuiFlexItem grow={false}>{/* Empty space to balance layout */}</EuiFlexItem>
     </EuiFlexGroup>
   );
 
@@ -470,24 +477,31 @@ export const SecondaryFlyout = ({
 
   // Create options component
   const renderOptions = () => (
-    <div style={{ padding: '12px 0' }}>
+    <div style={{ padding: '12px 8px' }}>
       <EuiText size="s">
         <p>What would you like to do with this log?</p>
       </EuiText>
       <EuiSpacer size="s" />
-      <EuiFlexGroup wrap>
+      <EuiFlexGroup direction="column" gutterSize="s">
         {predefinedOptions.map((option) => (
-          <EuiFlexItem key={option.id} grow={false} style={{ marginBottom: '8px' }}>
+          <EuiFlexItem key={option.id} grow={false}>
             <EuiButton 
               onClick={() => handleOptionSelect(option)}
               fill
               size="s"
+              style={{ 
+                borderRadius: '24px',
+                width: '100%',
+                textAlign: 'left',
+                paddingLeft: '16px',
+                paddingRight: '16px'
+              }}
               data-test-subj={`chatOption__${option.id}`}
             >
               {option.label}
             </EuiButton>
             {option.description && (
-              <EuiText size="xs" color="subdued" style={{ marginTop: '4px' }}>
+              <EuiText size="xs" color="subdued" style={{ marginTop: '4px', marginLeft: '8px', marginBottom: '4px' }}>
                 {option.description}
               </EuiText>
             )}
