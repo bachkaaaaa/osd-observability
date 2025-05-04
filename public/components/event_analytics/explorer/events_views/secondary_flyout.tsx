@@ -28,6 +28,12 @@ interface Message {
   isUser: boolean;
 }
 
+interface ChatOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
 interface SecondaryFlyoutProps {
   http: any;
   doc: any;
@@ -58,6 +64,17 @@ export const SecondaryFlyout = ({
   
   // State for save success message
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // State to track if options should be shown
+  const [showOptions, setShowOptions] = useState(false);
+  
+  // Predefined options for log analysis
+  const predefinedOptions: ChatOption[] = [
+    { id: 'explain', label: 'Explain this log', description: 'Get an explanation of what this log entry means' },
+    { id: 'anomaly', label: 'Detect anomalies', description: 'Check if this log contains anomalous patterns' },
+    { id: 'related', label: 'Find related logs', description: 'Search for logs related to this event' },
+    { id: 'remediation', label: 'Suggest remediation', description: 'Get suggestions on how to fix the issue' },
+  ];
   
   // Format doc data for display
   const formatDocData = (document: any) => {
@@ -100,6 +117,9 @@ export const SecondaryFlyout = ({
           isUser: false,
         };
         initialMessages.push(docMessage);
+        
+        // Show options when a log is selected
+        setShowOptions(true);
       }
       
       setMessages(initialMessages);
@@ -165,22 +185,21 @@ export const SecondaryFlyout = ({
       // Send message to dedicated chat endpoint
       const response = await http.post(`/api/observability/chat/message`, {
         body: JSON.stringify({
-          message: messageText
+          message: messageText,
+          logData: doc // Include the log data if available
         }),
       });
-      console.log('Response from server:', response);
-      // Simulate response after a short delay
-      setTimeout(() => {
-        const botMessage: Message = {
-          id: `bot-${Date.now()}`,
-          content: `I received: "${response.response}"`,
-          timestamp: new Date(),
-          isUser: false,
-        };
-        
-        setMessages(prevMessages => [...prevMessages, botMessage]);
-        setIsLoading(false);
-      }, 1000);
+      
+      // Add response to the messages
+      const botMessage: Message = {
+        id: `bot-${Date.now()}`,
+        content: response.response || 'Sorry, I could not process this request.',
+        timestamp: new Date(),
+        isUser: false,
+      };
+      
+      setMessages(prevMessages => [...prevMessages, botMessage]);
+      setIsLoading(false);
     } catch (error) {
       console.error('Error sending message:', error);
       setIsLoading(false);
@@ -299,6 +318,133 @@ export const SecondaryFlyout = ({
     return <p>{content}</p>;
   };
 
+  // New function to handle option selection
+  const handleOptionSelect = async (option: ChatOption) => {
+    // Prepare user message that combines log data and option
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      content: `${option.label} for the selected log data`,
+      timestamp: new Date(),
+      isUser: true,
+    };
+    
+    setMessages([...messages, userMessage]);
+    setIsLoading(true);
+    setShowOptions(false); // Hide options after selection
+    
+    try {
+      // Send message with both log data and selected option
+      const response = await http.post(`/api/observability/chat/message`, {
+        body: JSON.stringify({
+          message: option.label,
+          optionId: option.id,
+          logData: doc // Include the log data
+        }),
+      });
+      
+      // Add response to the messages
+      const botMessage: Message = {
+        id: `bot-${Date.now()}`,
+        content: response.response || 'Sorry, I could not process this request.',
+        timestamp: new Date(),
+        isUser: false,
+      };
+      
+      setMessages(prevMessages => [...prevMessages, botMessage]);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Add error message
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        content: 'Sorry, there was an error processing your request.',
+        timestamp: new Date(),
+        isUser: false,
+      };
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
+      setIsLoading(false);
+    }
+  };
+
+  // Create options component
+  const renderOptions = () => (
+    <div style={{ padding: '12px 0' }}>
+      <EuiText size="s">
+        <p>What would you like to do with this log?</p>
+      </EuiText>
+      <EuiSpacer size="s" />
+      <EuiFlexGroup wrap>
+        {predefinedOptions.map((option) => (
+          <EuiFlexItem key={option.id} grow={false} style={{ marginBottom: '8px' }}>
+            <EuiButton 
+              onClick={() => handleOptionSelect(option)}
+              fill
+              size="s"
+              data-test-subj={`chatOption__${option.id}`}
+            >
+              {option.label}
+            </EuiButton>
+            {option.description && (
+              <EuiText size="xs" color="subdued" style={{ marginTop: '4px' }}>
+                {option.description}
+              </EuiText>
+            )}
+          </EuiFlexItem>
+        ))}
+      </EuiFlexGroup>
+    </div>
+  );
+
+  // Update the input area in flyoutBody to conditionally show options or text input
+  const inputArea = showOptions ? (
+    <div style={{ 
+      position: 'sticky',
+      bottom: 0,
+      backgroundColor: 'white',
+      padding: '8px 0',
+      borderTop: '1px solid #eee',
+      zIndex: 100,
+      marginTop: 'auto'
+    }}>
+      {renderOptions()}
+    </div>
+  ) : (
+    <div style={{ 
+      position: 'sticky',
+      bottom: 0,
+      backgroundColor: 'white',
+      padding: '8px 0',
+      borderTop: '1px solid #eee',
+      zIndex: 100,
+      marginTop: 'auto'
+    }}>
+      <EuiFlexGroup gutterSize="s">
+        <EuiFlexItem>
+          <EuiFieldText
+            placeholder="Type your message here..."
+            value={messageText}
+            onChange={handleMessageChange}
+            onKeyPress={handleKeyPress}
+            fullWidth
+            data-test-subj="chatFlyout__messageInput"
+            aria-label="Type your message"
+          />
+        </EuiFlexItem>
+        <EuiFlexItem grow={false}>
+          <EuiButtonIcon
+            size="m"
+            color="primary"
+            onClick={sendMessage}
+            iconType="paperClip"
+            aria-label="Send message"
+            isDisabled={!messageText.trim()}
+            data-test-subj="chatFlyout__sendButton"
+          />
+        </EuiFlexItem>
+      </EuiFlexGroup>
+    </div>
+  );
+
   // Render conversation panel
   const flyoutBody = (
     <div style={{ 
@@ -365,41 +511,8 @@ export const SecondaryFlyout = ({
         </EuiCommentList>
       </div>
       
-      {/* Input area - fixed at the bottom */}
-      <div style={{ 
-        position: 'sticky',
-        bottom: 0,
-        backgroundColor: 'white',
-        padding: '8px 0',
-        borderTop: '1px solid #eee',
-        zIndex: 100,
-        marginTop: 'auto'
-      }}>
-        <EuiFlexGroup gutterSize="s">
-          <EuiFlexItem>
-            <EuiFieldText
-              placeholder="Type your message here..."
-              value={messageText}
-              onChange={handleMessageChange}
-              onKeyPress={handleKeyPress}
-              fullWidth
-              data-test-subj="chatFlyout__messageInput"
-              aria-label="Type your message"
-            />
-          </EuiFlexItem>
-          <EuiFlexItem grow={false}>
-            <EuiButtonIcon
-              size="m"
-              color="primary"
-              onClick={sendMessage}
-              iconType="paperClip"
-              aria-label="Send message"
-              isDisabled={!messageText.trim()}
-              data-test-subj="chatFlyout__sendButton"
-            />
-          </EuiFlexItem>
-        </EuiFlexGroup>
-      </div>
+      {/* Input area with conditional rendering */}
+      {inputArea}
     </div>
   );
 
