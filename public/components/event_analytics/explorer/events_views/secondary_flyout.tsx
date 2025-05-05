@@ -194,11 +194,17 @@ export const SecondaryFlyout = ({
     setIsLoading(true);
     
     try {
-      // Send message to dedicated chat endpoint
+      // Format the log data into a string if available
+      const logDataString = doc ? JSON.stringify(doc, null, 2) : '';
+      
+      // Combine user message and log data into a single message
+      const combinedMessage = logDataString 
+        ? `${messageText}\n\nLog Data:\n${logDataString}`
+        : messageText;
+      // Send message to dedicated chat endpoint with combined message
       const response = await http.post(`/api/observability/chat/message`, {
         body: JSON.stringify({
-          message: messageText,
-          logData: doc // Include the log data if available
+          message: combinedMessage
         }),
       });
       
@@ -391,6 +397,12 @@ export const SecondaryFlyout = ({
 
   // Function to render message content with formatting
   const renderMessageContent = (content: string) => {
+    // First ensure content is a string
+    if (typeof content !== 'string') {
+      console.warn('Expected string content but received:', content);
+      return <p>Unable to display content (invalid format)</p>;
+    }
+  
     // Check if this is a data message (starts with "Selected row data:")
     if (content.startsWith('Selected row data:')) {
       return (
@@ -402,7 +414,7 @@ export const SecondaryFlyout = ({
               const [key, ...valueParts] = line.split(':');
               const value = valueParts.join(':'); // Rejoin in case the value itself contains colons
               
-              if (key && key.startsWith('**') && key.endsWith('**')) {
+              if (key && key.includes('**')) {
                 const cleanKey = key.replace(/\*\*/g, '');
                 return (
                   <div key={index} style={{ display: 'flex', marginBottom: '4px' }}>
@@ -442,15 +454,24 @@ export const SecondaryFlyout = ({
     setShowOptions(false); // Hide options after selection
     
     try {
-      // Send message with both log data and selected option
+      // Format the log data into a string if available
+      const logDataString = doc ? JSON.stringify(doc, null, 2) : '';
+      
+      // Combine option label and log data into a single message
+      const combinedMessage = logDataString 
+        ? `${option.label}\n\nLog Data:\n${logDataString}`
+        : option.label;
+      
+      // Send message to dedicated chat endpoint with combined message  
       const response = await http.post(`/api/observability/chat/message`, {
         body: JSON.stringify({
-          message: option.label,
-          optionId: option.id,
-          logData: doc // Include the log data
+          message: combinedMessage,
         }),
       });
-      
+
+      console.log(response);
+
+      console.log(response);
       // Add response to the messages
       const botMessage: Message = {
         id: `bot-${Date.now()}`,
