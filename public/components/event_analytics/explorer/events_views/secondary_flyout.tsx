@@ -22,6 +22,7 @@ import {
   EuiModalFooter,
   EuiFormRow,
 } from '@elastic/eui';
+import ReactMarkdown from 'react-markdown';
 import { FlyoutContainers } from '../../../common/flyout_containers';
 import { NOTEBOOKS_API_PREFIX, CREATE_NOTE_MESSAGE } from '../../../../../common/constants/notebooks';
 
@@ -435,8 +436,20 @@ export const SecondaryFlyout = ({
       );
     }
     
-    // Regular message content
-    return <p>{content}</p>;
+    // Render message content as markdown for bot responses
+    return (
+      <ReactMarkdown
+        className="markdown-body"
+        components={{
+          h1: ({ node, ...props }) => <h1 {...props} style={{ fontSize: '24px', fontWeight: 'bold' }} />,
+          h2: ({ node, ...props }) => <h2 {...props} style={{ fontSize: '20px', fontWeight: 'bold' }} />,
+          h3: ({ node, ...props }) => <h3 {...props} style={{ fontSize: '18px', fontWeight: 'bold' }} />,
+          p: ({ node, ...props }) => <p {...props} style={{ marginBottom: '8px' }} />,
+        } as any}
+      >
+        {content}
+      </ReactMarkdown>
+    );
   };
 
   // New function to handle option selection
@@ -468,12 +481,11 @@ export const SecondaryFlyout = ({
           message: combinedMessage,
         }),
       });
-
+      
       console.log(response);
 
-      console.log(response);
       // Add response to the messages
-      const botMessage: Message = {
+      const botMessage: Message = { 
         id: `bot-${Date.now()}`,
         content: response.response || 'Sorry, I could not process this request.',
         timestamp: new Date(),

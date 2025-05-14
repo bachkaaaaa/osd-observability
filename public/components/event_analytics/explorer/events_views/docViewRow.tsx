@@ -327,7 +327,7 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
           secondaryAction
             ? secondaryFlyoutOpen
               ? 'minimize'
-              : 'dashboardApp'
+              : 'compute'
             : detailsOpen || surroundingEventsOpen
             ? 'minimize'
             : 'inspect'
