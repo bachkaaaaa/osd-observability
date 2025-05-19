@@ -35,7 +35,7 @@ export function registerChatRoutes(router: IRouter) {
         return res.ok({
           body: {
             // Return the original response data structure
-            response: data.response.response || data.result || JSON.stringify(data),
+            response: data.response || JSON.stringify(data),
             timestamp: new Date().toISOString(),
           },
         });

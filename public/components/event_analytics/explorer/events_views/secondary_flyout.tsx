@@ -81,10 +81,12 @@ export const SecondaryFlyout = ({
   // State to track if options should be shown
   const [showOptions, setShowOptions] = useState(false);
   
+  // Add state for closing confirmation
+  const [isClosingConfirmOpen, setIsClosingConfirmOpen] = useState(false);
+  
   // Predefined options for log analysis
   const predefinedOptions: ChatOption[] = [
     { id: 'explain', label: 'Explain this log', description: 'Get an explanation of what this log entry means' },
-    { id: 'anomaly', label: 'Detect anomalies', description: 'Check if this log contains anomalous patterns' },
     { id: 'related', label: 'Find related logs', description: 'Search for logs related to this event' },
     { id: 'remediation', label: 'Suggest remediation', description: 'Get suggestions on how to fix the issue' },
   ];
@@ -164,8 +166,54 @@ export const SecondaryFlyout = ({
   }, [messages]);
 
   // Close function
-  const closeFlyout = () => {
-    setSecondaryFlyoutOpen(false);
+  const closeFlyout = async () => {
+    // Only save if there are messages worth saving
+    if (messages.length > 1) {
+      // Format current date for title
+      const currentDate = new Date().toLocaleDateString();
+      const conversationTitle = getConversationTitle();
+      const suggestedTitle = `${conversationTitle} - ${currentDate}`;
+      
+      // Save directly without showing confirmation
+      try {
+        setIsSaving(true);
+        
+        // Format the conversation for the notebook content
+        const markdownContent = messages.map(msg => {
+          const author = msg.isUser ? '**You**' : '**Assistant**';
+          const time = msg.timestamp.toLocaleString();
+          return `${author} (${time}):\n\n${msg.content}\n`;
+        }).join('\n---\n\n');
+        
+        // Create a new notebook
+        const createResponse = await http.post(`${NOTEBOOKS_API_PREFIX}/note/savedNotebook`, {
+          body: JSON.stringify({ name: suggestedTitle }),
+        });
+        
+        // Add a paragraph with the conversation content
+        if (createResponse) {
+          await http.post(`${NOTEBOOKS_API_PREFIX}/savedNotebook/paragraph`, {
+            body: JSON.stringify({
+              noteId: createResponse,
+              paragraphIndex: 0,
+              paragraphInput: `%md\n# ${suggestedTitle}\n\n${markdownContent}`,
+              inputType: 'MARKDOWN',
+            }),
+          });
+          
+          console.log(`Notebook automatically saved with ID: ${createResponse}`);
+        }
+      } catch (error) {
+        console.error('Error auto-saving notebook:', error);
+      } finally {
+        setIsSaving(false);
+        // Close the flyout regardless of success/failure
+        setSecondaryFlyoutOpen(false);
+      }
+    } else {
+      // If no meaningful conversation, just close without saving
+      setSecondaryFlyoutOpen(false);
+    }
   };
 
   // Toggle size
@@ -244,17 +292,49 @@ export const SecondaryFlyout = ({
     setMessages([defaultMessage]);
   };
   
-  // Updated save to notebook function - shows modal to get title
-  const saveToNotebook = () => {
-    // Format current date for default title
-    const currentDate = new Date().toLocaleDateString();
-    setNotebookTitle(`Chat Conversation - ${currentDate}`);
-    setIsNotebookModalVisible(true);
+  // Function to get the first three words from user messages
+  const getConversationTitle = () => {
+    // Find the first user message
+    const firstUserMessage = messages.find(msg => msg.isUser);
+    
+    if (firstUserMessage) {
+      // Get first three words
+      const words = firstUserMessage.content.split(' ').filter(word => word.trim().length > 0);
+      const firstThreeWords = words.slice(0, 3).join(' ');
+      
+      if (firstThreeWords) {
+        return firstThreeWords;
+      }
+    }
+    
+    // Default if no user message or not enough words
+    return 'Chat Conversation';
   };
   
-  // Function to handle actual notebook creation
-  const createNotebook = async () => {
-    if (!notebookTitle.trim()) {
+  // Updated save to notebook function - can skip modal if specified
+  const saveToNotebook = (skipModal = false) => {
+    // Format current date for default title
+    const currentDate = new Date().toLocaleDateString();
+    const conversationTitle = getConversationTitle();
+    const suggestedTitle = `${conversationTitle} - ${currentDate}`;
+    
+    setNotebookTitle(suggestedTitle);
+    
+    if (skipModal) {
+      // Save directly without showing the modal
+      createNotebook(suggestedTitle);
+    } else {
+      // Show the modal for user to edit the title
+      setIsNotebookModalVisible(true);
+    }
+  };
+  
+  // Function to handle actual notebook creation - accepts optional title parameter
+  const createNotebook = async (title?: string) => {
+    // Use provided title or the one from state
+    const finalTitle = title || notebookTitle;
+    
+    if (!finalTitle.trim()) {
       return; // Don't create notebook without a title
     }
     
@@ -270,7 +350,7 @@ export const SecondaryFlyout = ({
       
       // Create a new notebook
       const createResponse = await http.post(`${NOTEBOOKS_API_PREFIX}/note/savedNotebook`, {
-        body: JSON.stringify({ name: notebookTitle }),
+        body: JSON.stringify({ name: finalTitle }),
       });
       
       // Add a paragraph with the conversation content
@@ -279,7 +359,7 @@ export const SecondaryFlyout = ({
           body: JSON.stringify({
             noteId: createResponse,
             paragraphIndex: 0,
-            paragraphInput: `%md\n# Chat Conversation\n\n${markdownContent}`,
+            paragraphInput: `%md\n# ${finalTitle}\n\n${markdownContent}`,
             inputType: 'MARKDOWN',
           }),
         });
@@ -288,7 +368,7 @@ export const SecondaryFlyout = ({
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
         
-        // Close the modal
+        // Close the modal if it's open
         setIsNotebookModalVisible(false);
         
         // Provide a link to the new notebook
@@ -300,7 +380,7 @@ export const SecondaryFlyout = ({
       setIsSaving(false);
     }
   };
-  
+
   // Cancel notebook creation
   const cancelNotebookCreation = () => {
     setIsNotebookModalVisible(false);
@@ -464,12 +544,11 @@ export const SecondaryFlyout = ({
     
     setMessages([...messages, userMessage]);
     setIsLoading(true);
-    setShowOptions(false); // Hide options after selection
     
     try {
       // Format the log data into a string if available
       const logDataString = doc ? JSON.stringify(doc, null, 2) : '';
-      
+      console .log('Log data:', logDataString);
       // Combine option label and log data into a single message
       const combinedMessage = logDataString 
         ? `${option.label}\n\nLog Data:\n${logDataString}`
@@ -544,8 +623,26 @@ export const SecondaryFlyout = ({
     </div>
   );
 
-  // Update the input area in flyoutBody to conditionally show options or text input
-  const inputArea = showOptions ? (
+  // New handler for confirming save to notebook - now directly saves
+  const handleCloseWithSave = async () => {
+    await saveToNotebook(true); // Pass true to skip the modal and save directly
+    setIsClosingConfirmOpen(false);
+    setSecondaryFlyoutOpen(false);
+  };
+  
+  // New handler for closing without saving
+  const handleCloseWithoutSave = () => {
+    setIsClosingConfirmOpen(false);
+    setSecondaryFlyoutOpen(false);
+  };
+  
+  // Remove or comment out the closing confirmation modal since we're not using it anymore
+  // const closingConfirmModal = isClosingConfirmOpen ? (
+  //   ...
+  // ) : null;
+  
+  // Replace the inputArea with only options
+  const inputArea = (
     <div style={{ 
       position: 'sticky',
       bottom: 0,
@@ -556,41 +653,6 @@ export const SecondaryFlyout = ({
       marginTop: 'auto'
     }}>
       {renderOptions()}
-    </div>
-  ) : (
-    <div style={{ 
-      position: 'sticky',
-      bottom: 0,
-      backgroundColor: 'white',
-      padding: '8px 0',
-      borderTop: '1px solid #eee',
-      zIndex: 100,
-      marginTop: 'auto'
-    }}>
-      <EuiFlexGroup gutterSize="s">
-        <EuiFlexItem>
-          <EuiFieldText
-            placeholder="Type your message here..."
-            value={messageText}
-            onChange={handleMessageChange}
-            onKeyPress={handleKeyPress}
-            fullWidth
-            data-test-subj="chatFlyout__messageInput"
-            aria-label="Type your message"
-          />
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiButtonIcon
-            size="m"
-            color="primary"
-            onClick={sendMessage}
-            iconType="paperClip"
-            aria-label="Send message"
-            isDisabled={!messageText.trim()}
-            data-test-subj="chatFlyout__sendButton"
-          />
-        </EuiFlexItem>
-      </EuiFlexGroup>
     </div>
   );
 
