@@ -41,6 +41,7 @@ export const FlyoutContainers = ({
         onClose={() => closeFlyout()}
         size={size ? size : 'm'}
         aria-labelledby={ariaLabel}
+        
       >
         {flyoutHeader}
         {flyoutBody}

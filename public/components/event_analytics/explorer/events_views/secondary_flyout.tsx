@@ -52,6 +52,10 @@ interface SecondaryFlyoutProps {
   setFlyoutToggleSize: (isLarge: boolean) => void;
 }
 
+// Add these at the top of your file, outside any component
+let activeFlyoutInstance: string | null = null;
+let closeActiveFlyoutCallback: (() => void) | null = null;
+
 export const SecondaryFlyout = ({
   http,
   doc,
@@ -61,6 +65,44 @@ export const SecondaryFlyout = ({
   flyoutToggleSize,
   setFlyoutToggleSize,
 }: SecondaryFlyoutProps) => {
+  // Create a unique ID for this instance
+  const instanceId = useRef(`flyout-${Date.now()}`).current;
+  
+  // Check if we should display this instance when mounting/updating
+  useEffect(() => {
+    if (secondaryFlyoutOpen) {
+      if (activeFlyoutInstance && activeFlyoutInstance !== instanceId) {
+        // Another flyout is already active, close it first
+        console.log('Closing existing chat flyout to open a new one.');
+        if (closeActiveFlyoutCallback) {
+          closeActiveFlyoutCallback();
+        }
+        
+        // Register this as the new active flyout
+        activeFlyoutInstance = instanceId;
+        closeActiveFlyoutCallback = () => {
+          // Simple close without saving
+          setSecondaryFlyoutOpen(false);
+        };
+      } else {
+        // Register this as the active flyout
+        activeFlyoutInstance = instanceId;
+        closeActiveFlyoutCallback = () => {
+          // Simple close without saving
+          setSecondaryFlyoutOpen(false);
+        };
+      }
+    }
+    
+    // Cleanup when component unmounts
+    return () => {
+      if (activeFlyoutInstance === instanceId) {
+        activeFlyoutInstance = null;
+        closeActiveFlyoutCallback = null;
+      }
+    };
+  }, [secondaryFlyoutOpen, instanceId, setSecondaryFlyoutOpen]);
+
   // State for message input
   const [messageText, setMessageText] = useState('');
   
@@ -84,6 +126,9 @@ export const SecondaryFlyout = ({
   // Add state for closing confirmation
   const [isClosingConfirmOpen, setIsClosingConfirmOpen] = useState(false);
   
+  // Add state variable near your other state declarations
+  const [optionSelected, setOptionSelected] = useState(false);
+
   // Predefined options for log analysis
   const predefinedOptions: ChatOption[] = [
     { id: 'explain', label: 'Explain this log', description: 'Get an explanation of what this log entry means' },
@@ -101,54 +146,50 @@ export const SecondaryFlyout = ({
     return `Selected row data:\n${fields}`;
   };
   
-  // Load saved messages on component mount and add row data
+  // Load fresh messages when flyout opens and add row data
   useEffect(() => {
-    try {
-      const savedMessages = localStorage.getItem(STORAGE_KEY);
-      let initialMessages: Message[] = [];
-      
-      if (savedMessages) {
-        // Need to convert the date strings back to Date objects
-        initialMessages = JSON.parse(savedMessages).map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }));
-      } else {
-        // Set default welcome message if no saved messages
-        initialMessages = [{
-          id: '1',
+    // Only initialize messages when the flyout is opened
+    if (secondaryFlyoutOpen) {
+      try {
+        // Always start with a fresh welcome message
+        let initialMessages: Message[] = [{
+          id: `welcome-${Date.now()}`,
           content: 'Hello! How can I help you today?',
           timestamp: new Date(),
           isUser: false,
         }];
-      }
-      
-      // Add the row data as a system message if we have document data
-      if (doc && Object.keys(doc).length > 0) {
-        const docMessage: Message = {
-          id: `doc-${Date.now()}`,
-          content: formatDocData(doc),
+        
+        // Add the row data as a system message if we have document data
+        if (doc && Object.keys(doc).length > 0) {
+          const docMessage: Message = {
+            id: `doc-${Date.now()}`,
+            content: formatDocData(doc),
+            timestamp: new Date(),
+            isUser: false,
+          };
+          initialMessages.push(docMessage);
+          
+          // Show options when a log is selected
+          setShowOptions(true);
+        }
+        
+        // Reset the option selected state
+        setOptionSelected(false);
+        
+        // Set fresh messages
+        setMessages(initialMessages);
+      } catch (error) {
+        console.error('Error initializing messages:', error);
+        // Set default if there's an error
+        setMessages([{
+          id: `error-${Date.now()}`,
+          content: 'Hello! How can I help you today?',
           timestamp: new Date(),
           isUser: false,
-        };
-        initialMessages.push(docMessage);
-        
-        // Show options when a log is selected
-        setShowOptions(true);
+        }]);
       }
-      
-      setMessages(initialMessages);
-    } catch (error) {
-      console.error('Error loading saved messages:', error);
-      // Set default if there's an error
-      setMessages([{
-        id: '1',
-        content: 'Hello! How can I help you today?',
-        timestamp: new Date(),
-        isUser: false,
-      }]);
     }
-  }, [doc]); // Re-run when doc changes
+  }, [secondaryFlyoutOpen, doc]); // Re-run when flyout opens or doc changes
   
   // Save messages to local storage whenever they change
   useEffect(() => {
@@ -167,51 +208,24 @@ export const SecondaryFlyout = ({
 
   // Close function
   const closeFlyout = async () => {
-    // Only save if there are messages worth saving
-    if (messages.length > 1) {
+    // First clear the active instance reference
+    if (activeFlyoutInstance === instanceId) {
+      activeFlyoutInstance = null;
+      closeActiveFlyoutCallback = null;
+    }
+    
+    // Only prompt to save if there are messages AND an option was selected
+    if (messages.length > 1 && optionSelected) {
       // Format current date for title
       const currentDate = new Date().toLocaleDateString();
       const conversationTitle = getConversationTitle();
       const suggestedTitle = `${conversationTitle} - ${currentDate}`;
       
-      // Save directly without showing confirmation
-      try {
-        setIsSaving(true);
-        
-        // Format the conversation for the notebook content
-        const markdownContent = messages.map(msg => {
-          const author = msg.isUser ? '**You**' : '**Assistant**';
-          const time = msg.timestamp.toLocaleString();
-          return `${author} (${time}):\n\n${msg.content}\n`;
-        }).join('\n---\n\n');
-        
-        // Create a new notebook
-        const createResponse = await http.post(`${NOTEBOOKS_API_PREFIX}/note/savedNotebook`, {
-          body: JSON.stringify({ name: suggestedTitle }),
-        });
-        
-        // Add a paragraph with the conversation content
-        if (createResponse) {
-          await http.post(`${NOTEBOOKS_API_PREFIX}/savedNotebook/paragraph`, {
-            body: JSON.stringify({
-              noteId: createResponse,
-              paragraphIndex: 0,
-              paragraphInput: `%md\n# ${suggestedTitle}\n\n${markdownContent}`,
-              inputType: 'MARKDOWN',
-            }),
-          });
-          
-          console.log(`Notebook automatically saved with ID: ${createResponse}`);
-        }
-      } catch (error) {
-        console.error('Error auto-saving notebook:', error);
-      } finally {
-        setIsSaving(false);
-        // Close the flyout regardless of success/failure
-        setSecondaryFlyoutOpen(false);
-      }
+      // Show notebook naming modal instead of auto-saving
+      setNotebookTitle(suggestedTitle);
+      setIsNotebookModalVisible(true);
     } else {
-      // If no meaningful conversation, just close without saving
+      // If no meaningful conversation or no option was selected, just close without saving
       setSecondaryFlyoutOpen(false);
     }
   };
@@ -384,6 +398,7 @@ export const SecondaryFlyout = ({
   // Cancel notebook creation
   const cancelNotebookCreation = () => {
     setIsNotebookModalVisible(false);
+    // Don't close the flyout when just canceling the modal
   };
   
   // Notebook creation modal
@@ -395,7 +410,7 @@ export const SecondaryFlyout = ({
       
       <EuiModalBody>
         <EuiText size="s">
-          <p>{CREATE_NOTE_MESSAGE || 'Enter a name to describe the purpose of this notebook.'}</p>
+          <p>Would you like to save this log analysis conversation as a notebook?</p>
         </EuiText>
         <EuiSpacer size="m" />
         <EuiFormRow label="Notebook Title">
@@ -413,20 +428,27 @@ export const SecondaryFlyout = ({
       
       <EuiModalFooter>
         <EuiButton
-          onClick={cancelNotebookCreation}
+          onClick={() => {
+            setIsNotebookModalVisible(false);
+            setSecondaryFlyoutOpen(false);
+          }}
           disabled={isSaving}
-          data-test-subj="cancelNotebookCreationButton"
+          data-test-subj="dontSaveButton"
         >
-          Cancel
+          Don't Save
         </EuiButton>
         <EuiButton
           fill
-          onClick={createNotebook}
+          onClick={() => {
+            createNotebook();
+            setIsNotebookModalVisible(false);
+            setSecondaryFlyoutOpen(false);
+          }}
           isLoading={isSaving}
           disabled={!notebookTitle.trim() || isSaving}
-          data-test-subj="createNotebookButton"
+          data-test-subj="saveAndCloseButton"
         >
-          Save
+          Save and Close
         </EuiButton>
       </EuiModalFooter>
     </EuiModal>
@@ -534,6 +556,9 @@ export const SecondaryFlyout = ({
 
   // New function to handle option selection
   const handleOptionSelect = async (option: ChatOption) => {
+    // Set the flag to indicate an option was selected
+    setOptionSelected(true);
+    
     // Prepare user message that combines log data and option
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -655,6 +680,11 @@ export const SecondaryFlyout = ({
       {renderOptions()}
     </div>
   );
+
+  // Don't render if we're not supposed to be open
+  if (!secondaryFlyoutOpen) {
+    return null;
+  }
 
   // Render conversation panel
   const flyoutBody = (
