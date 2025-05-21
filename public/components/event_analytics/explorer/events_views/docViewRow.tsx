@@ -19,7 +19,7 @@ import {
 import { SurroundingFlyout } from './surrounding_flyout';
 import PPLService from '../../../../services/requests/ppl';
 import { isValidTraceId } from '../../utils';
-import { SecondaryFlyout } from './secondary_flyout';
+import { SecondaryFlyout } from './chat_assistant/secondary_flyout';
 
 export interface IDocType {
   [key: string]: string;
