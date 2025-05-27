@@ -572,17 +572,17 @@ export const SecondaryFlyout = ({
     
     try {
       // Format the log data into a string if available
-      const logDataString = doc ? JSON.stringify(doc, null, 2) : '';
-      console .log('Log data:', logDataString);
+     const logDataString = doc ? JSON.stringify(doc, null, 2) : '';
+      //console .log('Log data:', logDataString);
+      console .log(doc);
       // Combine option label and log data into a single message
-      const combinedMessage = logDataString 
-        ? `${option.label}\n\nLog Data:\n${logDataString}`
-        : option.label;
+      
       
       // Send message to dedicated chat endpoint with combined message  
       const response = await http.post(`/api/observability/chat/message`, {
         body: JSON.stringify({
-          message: combinedMessage,
+          log: logDataString,
+          query: option.label,
         }),
       });
       

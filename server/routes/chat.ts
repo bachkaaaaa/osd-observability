@@ -1,6 +1,7 @@
 // In a new file: /server/routes/chat/chat_router.ts
 import { schema } from '@osd/config-schema';
 import { IOpenSearchDashboardsResponse, IRouter, ResponseError } from '../../../../src/core/server';
+import { log } from 'console';
 
 export function registerChatRoutes(router: IRouter) {
   router.post(
@@ -8,21 +9,20 @@ export function registerChatRoutes(router: IRouter) {
       path: '/api/observability/chat/message',
       validate: {
         body: schema.object({
-          message: schema.string()
+          log: schema.string(),
+          query: schema.string(),
         }),
       },
     },
     async (context, req, res) => {
       try {
         // Forward the message to the external API
-        const response = await fetch('http://localhost:5000/search', {
+        const response = await fetch('http://localhost:8080/rag/query', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            query: req.body.message,
-          }),
+          body: JSON.stringify(req.body),
         });
 
         if (!response.ok) {
