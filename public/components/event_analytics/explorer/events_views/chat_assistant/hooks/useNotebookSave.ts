@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Message } from '../types';
 import { NOTEBOOKS_API_PREFIX } from '../../../../../../../common/constants/notebooks';
+import { coreRefs } from '../../../../../../framework/core_refs';
 
 export const useNotebookSave = (http: any, messages: Message[]) => {
   const [isNotebookModalVisible, setIsNotebookModalVisible] = useState(false);
@@ -84,6 +85,13 @@ export const useNotebookSave = (http: any, messages: Message[]) => {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
         
+        // Show success toast
+        coreRefs.core?.notifications.toasts.addSuccess({
+          title: 'Notebook saved',
+          text: `"${finalTitle}" has been successfully saved.`,
+          'data-test-subj': 'notebookSaveSuccessToast'
+        });
+        
         // Close the modal if it's open
         setIsNotebookModalVisible(false);
         
@@ -91,6 +99,13 @@ export const useNotebookSave = (http: any, messages: Message[]) => {
         console.log(`Notebook created with ID: ${createResponse}`);
       }
     } catch (error) {
+      // Show error toast
+      coreRefs.core?.notifications.toasts.addDanger({
+        title: 'Failed to save notebook',
+        text: error.message || 'An error occurred while saving the notebook.',
+        'data-test-subj': 'notebookSaveErrorToast'
+      });
+      
       console.error('Error saving notebook:', error);
     } finally {
       setIsSaving(false);

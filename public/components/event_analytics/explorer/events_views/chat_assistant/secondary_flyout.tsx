@@ -4,7 +4,6 @@ import {
   EuiFlexGroup,
   EuiFlexItem,
 } from '@elastic/eui';
-
 import { FlyoutContainers } from '../../../../common/flyout_containers';
 import { useFlyoutInstance } from './hooks/useFlyoutInstance';
 import { useChatMessages } from './hooks/useChatMessages';
