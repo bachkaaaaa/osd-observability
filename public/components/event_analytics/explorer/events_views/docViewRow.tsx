@@ -327,12 +327,20 @@ export const FlyoutButton = forwardRef((props: FlyoutButtonProps, ref) => {
           secondaryAction
             ? secondaryFlyoutOpen
               ? 'minimize'
-              : 'compute'
+              : 'user'
             : detailsOpen || surroundingEventsOpen
             ? 'minimize'
             : 'inspect'
         }
-        aria-label={secondaryAction ? 'open secondary flyout' : 'inspect document details'}
+        aria-label={
+          secondaryAction
+            ? secondaryFlyoutOpen 
+              ? "minimize chat assistant" 
+              : "ask chat assistance"
+            : detailsOpen || surroundingEventsOpen
+              ? "minimize details"
+              : "inspect details"
+        }
         data-test-subj={secondaryAction ? 'eventExplorer__secondaryFlyout' : 'eventExplorer__flyout'}
       />
       {flyout}

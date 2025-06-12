@@ -16,8 +16,17 @@ export function registerChatRoutes(router: IRouter) {
     },
     async (context, req, res) => {
       try {
+        const RAG_API_URL = process.env.RAG_API_URL;
+        if (!RAG_API_URL) {
+          return res.customError({
+            statusCode: 500,
+            body: {
+              message: 'RAG_API_URL environment variable is not set.',
+            },
+          });
+        }
         // Forward the message to the external API
-        const response = await fetch('http://localhost:8080/rag/query', {
+        const response = await fetch(RAG_API_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

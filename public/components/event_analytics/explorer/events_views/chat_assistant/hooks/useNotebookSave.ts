@@ -69,7 +69,7 @@ export const useNotebookSave = (http: any, messages: Message[]) => {
       const createResponse = await http.post(`${NOTEBOOKS_API_PREFIX}/note/savedNotebook`, {
         body: JSON.stringify({ name: finalTitle }),
       });
-      
+      console.log(createResponse)
       // Add a paragraph with the conversation content
       if (createResponse) {
         await http.post(`${NOTEBOOKS_API_PREFIX}/savedNotebook/paragraph`, {

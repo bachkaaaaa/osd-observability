@@ -142,21 +142,15 @@ export const SecondaryFlyout = ({
 
   // Render flyout footer
   const flyoutFooter = (
-    <EuiFlexGroup justifyContent="spaceBetween">
+    <EuiFlexGroup justifyContent="spaceBetween" gutterSize="m" style={{ padding: '8px 16px' }}>
       <EuiFlexItem grow={false}>
         <EuiButton 
           onClick={toggleSize} 
           data-test-subj="chatFlyout__resizeButton"
+          size="s"
+          style={{ minWidth: '100px' }}
         >
           {flyoutToggleSize ? 'Expand' : 'Collapse'}
-        </EuiButton>
-      </EuiFlexItem>
-      <EuiFlexItem grow={false}>
-        <EuiButton 
-          onClick={closeFlyout} 
-          data-test-subj="chatFlyout__closeButton"
-        >
-          Close
         </EuiButton>
       </EuiFlexItem>
     </EuiFlexGroup>
