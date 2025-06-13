@@ -106,15 +106,13 @@ export const useChatMessages = (
       // Format the log data into a string if available
       const logDataString = doc ? JSON.stringify(doc, null, 2) : '';
       
-      // Combine user message and log data into a single message
-      const combinedMessage = logDataString 
-        ? `${textToSend}\n\nLog Data:\n${logDataString}`
-        : textToSend;
+      
 
       // Send message to dedicated chat endpoint with combined message
       const response = await http.post(`/api/observability/chat/message`, {
         body: JSON.stringify({
-          message: combinedMessage
+          log: logDataString,
+          query: textToSend
         }),
       });
       

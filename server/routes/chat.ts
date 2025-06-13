@@ -26,7 +26,7 @@ export function registerChatRoutes(router: IRouter) {
           });
         }
         // Forward the message to the external API
-        const response = await fetch(RAG_API_URL, {
+        const response = await fetch("http://localhost:8080/rag/query", {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
